@@ -19,6 +19,8 @@ AWS Bedrock を活用した、エンタープライズグレードの RAG（Retr
 
 ## アーキテクチャ
 
+<img width="1243" height="900" alt="スクリーンショット 2025-12-04 12 13 33" src="https://github.com/user-attachments/assets/0438ecef-2cc0-4830-8095-f039033e0a9d" />
+
 ### システム全体図
 
 ```mermaid
