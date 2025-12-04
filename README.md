@@ -1,93 +1,166 @@
-# AI Agent System (MVP)
+# RAG AI Agent
 
-Amazon Bedrock AgentCore上で動作する、最小限のAIエージェントシステムです。
-LangGraphを使用したエージェントロジックと、Next.jsによるチャットUIを提供します。
+AWS Bedrock を活用した、エンタープライズグレードの RAG（Retrieval-Augmented Generation）対応 AI チャットシステム
 
-## システム要件
+[![GitHub](https://img.shields.io/badge/GitHub-ojagao%2Frag--ai--agent-blue)](https://github.com/ojagao/rag-ai-agent)
 
-- **Python**: 3.10以上
-- **Node.js**: v18以上
-- **AWS CLI**: 設定済みであること
-- **Amazon Bedrock**: `openai.gpt-oss-120b-1:0` モデルのアクセスが有効化されていること
+## 概要
 
-## セットアップ手順
+本プロジェクトは、AWS の最新技術スタックを活用した AI エージェントシステムです。管理画面からドキュメントを管理し、リアルタイムでベクトル検索に反映される RAG 機能を備えています。
 
-### 1. 環境変数の設定
+### 主な特徴
 
-プロジェクトルートに `.env` ファイルを作成します（`.env.example` をコピー）。
+- 🤖 **LangGraph ベースのエージェント** - 柔軟な会話フローを実現
+- 📚 **RAG 機能** - S3 Vectors + Bedrock Knowledge Bases による高速検索
+- 🎨 **モダンな UI** - Next.js + Tailwind CSS によるダークモード対応
+- 🔄 **リアルタイム同期** - ドキュメント更新を自動でベクトルDBに反映
+- 📊 **可観測性** - LangSmith による実行トレース
+- ☁️ **AWS ネイティブ** - フルマネージドサービスで運用負荷を最小化
 
-```bash
-cp .env.example .env
+## アーキテクチャ
+
+### システム全体図
+
+```mermaid
+graph TB
+    User[ユーザー]
+    
+    subgraph "フロントエンド"
+        UI[Next.js UI<br/>チャット画面]
+        Admin[管理画面<br/>ドキュメント管理]
+    end
+    
+    subgraph "バックエンド"
+        API[FastAPI<br/>REST API]
+        Agent[LangGraph Agent<br/>会話制御]
+    end
+    
+    subgraph "AWS Services"
+        S3[S3 バケット<br/>元データ保存]
+        Lambda[Lambda<br/>同期トリガー]
+        KB[Bedrock KB<br/>RAG エンジン]
+        S3V[S3 Vectors<br/>ベクトル保存]
+        LLM[Bedrock LLM<br/>GPT-OSS-120B]
+    end
+    
+    User -->|チャット| UI
+    User -->|ドキュメント編集| Admin
+    UI --> API
+    Admin --> API
+    API --> Agent
+    Agent --> KB
+    Agent --> LLM
+    Admin -->|保存| S3
+    S3 -->|イベント| Lambda
+    Lambda -->|同期| KB
+    KB --> S3V
+    KB --> LLM
 ```
 
-`.env` の内容を確認・修正します：
-```bash
-AWS_REGION=ap-northeast-1
-AWS_PROFILE=sandbox-only-aso  # 必要に応じて変更
-BEDROCK_MODEL_ID=openai.gpt-oss-120b-1:0
-BACKEND_URL=http://localhost:8001
+### RAG データフロー
+
+```mermaid
+sequenceDiagram
+    participant Admin as 管理者
+    participant S3 as S3 バケット
+    participant Lambda as Lambda 関数
+    participant KB as Bedrock KB
+    participant S3V as S3 Vectors
+    participant User as ユーザー
+    participant Agent as AI Agent
+    
+    Admin->>S3: ドキュメント追加/編集
+    S3->>Lambda: S3 イベント通知
+    Lambda->>KB: 同期ジョブ起動
+    KB->>KB: ベクトル化
+    KB->>S3V: ベクトル保存
+    
+    User->>Agent: 質問
+    Agent->>KB: ベクトル検索
+    KB->>S3V: 類似検索
+    S3V-->>KB: 関連ドキュメント
+    KB-->>Agent: コンテキスト
+    Agent->>Agent: LLM で回答生成
+    Agent-->>User: 回答（最新データ反映）
 ```
 
-### 2. バックエンド (Python) の起動
+## 技術スタック
 
-```bash
-# 仮想環境の作成と有効化
-python3.11 -m venv .venv
-source .venv/bin/activate
+### フロントエンド
+- **Framework**: Next.js 15 (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **UI Components**: React 19
+- **HTTP Client**: Axios
+- **Markdown**: react-markdown, remark-gfm
 
-# 依存関係のインストール
-pip install -r backend/requirements.txt
+### バックエンド
+- **Framework**: FastAPI
+- **Language**: Python 3.11+
+- **Agent**: LangGraph, LangChain
+- **AWS SDK**: boto3
+- **Validation**: Pydantic
+- **Observability**: LangSmith
 
-# サーバー起動 (ポート 8001)
-cd backend
-python app.py
+### AWS Services
+- **LLM**: Amazon Bedrock (GPT-OSS-120B)
+- **Embeddings**: Bedrock Titan Embeddings
+- **Vector Store**: S3 Vectors
+- **RAG Engine**: Bedrock Knowledge Bases
+- **Storage**: Amazon S3
+- **Compute**: AWS Lambda
+- **Deployment**: AgentCore Runtime
+
+## プロジェクト構成
+
 ```
-バックエンドは `http://localhost:8001` で起動します。
-ヘルスチェック: `http://localhost:8001/health`
-
-### 3. フロントエンド (Next.js) の起動
-
-別のターミナルを開いて実行してください。
-
-```bash
-cd frontend
-
-# 依存関係のインストール
-npm install
-
-# 開発サーバー起動
-npm run dev
+rag-ai-agent/
+├── backend/                 # Python バックエンド
+│   ├── app.py              # FastAPI エントリーポイント
+│   ├── agent/              # エージェントロジック
+│   │   ├── core.py         # LangGraph 定義
+│   │   ├── rag.py          # RAG 機能
+│   │   └── config.py       # 設定管理
+│   └── requirements.txt    # Python 依存関係
+├── frontend/               # Next.js フロントエンド
+│   ├── app/                # App Router
+│   │   └── page.tsx        # チャット画面
+│   └── components/         # React コンポーネント
+│       ├── ChatMessage.tsx
+│       ├── ChatInput.tsx
+│       └── ChatContainer.tsx
+├── docs/                   # ドキュメント
+│   └── setup.md           # セットアップ手順
+└── .env                    # 環境変数（要作成）
 ```
-フロントエンドは通常 `http://localhost:3000` (または 3001) で起動します。
-ブラウザでアクセスしてチャットを開始してください。
 
-## AgentCoreへのデプロイ
+## 機能
 
-本番環境（AgentCore）へのデプロイ手順です。
+### 現在利用可能
+- ✅ リアルタイムチャット
+- ✅ 会話履歴の保持
+- ✅ Markdown レンダリング（テーブル、リスト、コードブロック）
+- ✅ LangSmith トレーシング
+- ✅ ダークモード UI
 
-1.  **AgentCore CLIのインストール**
-    ```bash
-    pip install bedrock-agentcore-starter-toolkit
-    ```
+### 開発中（フェーズ9）
+- 🚧 RAG 機能（S3 Vectors + Bedrock KB）
+- 🚧 ドキュメント管理画面
+- 🚧 リアルタイム同期
 
-2.  **設定とデプロイ**
-    ```bash
-    cd backend
-    agentcore configure \
-      --entrypoint agent/agentcore_wrapper.py \
-      --requirements-file requirements.txt \
-      --non-interactive
+### 今後の予定
+- 📋 AWS 本番環境デプロイ（S3 + CloudFront）
+- 📋 認証機能（AWS Cognito）
+- 📋 マルチユーザー対応
 
-    agentcore launch
-    ```
+## ドキュメント
 
-3.  **動作確認**
-    ```bash
-    agentcore invoke '{"prompt": "こんにちは"}'
-    ```
+- [セットアップ手順](docs/setup.md) - ローカル環境構築
+- [タスク管理](TASK.md) - 開発進捗
+- [要件定義](REQUIREMENTS.md) - システム仕様
+- [エージェントガイド](AGENTS.md) - AI エージェント向けガイド
 
-## トラブルシューティング
+## 作成者
 
-- **Backend Port Error**: ポート8001が使用中の場合、`backend/app.py` のポート番号を変更し、`.env` と `frontend/app/page.tsx` も合わせて更新してください。
-- **AWS Error**: `AWS_PROFILE` やリージョン設定を確認してください。`aws sts get-caller-identity` で認証情報を確認できます。
-- **Module Not Found**: 仮想環境 (`.venv`) が有効になっているか確認してください。
+[@ojagao](https://github.com/ojagao)
+
